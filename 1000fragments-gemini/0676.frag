@@ -2,73 +2,100 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
+#define PI 3.14159265359
 #define TAU 6.28318530718
 
-float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+mat2 rot(float a) {
+    float s = sin(a), c = cos(a);
+    return mat2(c, -s, s, c);
 }
 
-float noise(vec2 st) {
-    vec2 i = floor(st);
-    vec2 f = fract(st);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(random(i + vec2(0.0, 0.0)), random(i + vec2(1.0, 0.0)), u.x), 
-               mix(random(i + vec2(0.0, 1.0)), random(i + vec2(1.0, 1.0)), u.x), u.y);
+float hash12(vec2 p) {
+    vec3 p3  = fract(vec3(p.xyx) * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
 }
 
-float fbm(vec2 st) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    for (int i = 0; i < 5; i++) {
-        value += amplitude * noise(st);
-        st *= 2.0;
-        amplitude *= 0.5;
+vec2 hash22(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * vec3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx+33.33);
+    return fract((p3.xx+p3.yz)*p3.zy);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f*f*(3.0-2.0*f);
+    float res = mix(
+        mix(hash12(i + vec2(0,0)), hash12(i + vec2(1,0)), f.x),
+        mix(hash12(i + vec2(0,1)), hash12(i + vec2(1,1)), f.x), f.y);
+    return res;
+}
+
+float fbm(vec2 p) {
+    float f = 0.0;
+    float amp = 0.5;
+    for(int i = 0; i < 4; i++) {
+        f += amp * noise(p);
+        p = rot(1.1) * p * 2.0;
+        amp *= 0.5;
     }
-    return value;
+    return f;
 }
 
-mat2 rotate2d(float angle) {
-    return mat2(cos(angle), -sin(angle), sin(angle), cos(angle));
-}
-
-vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
-    return a + b * cos(TAU * (c * t + d));
-}
-
-vec3 hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
-}
-
-vec2 random2(vec2 p) {
-    return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
-}
-
-float voronoi(vec2 x) {
-    vec2 n = floor(x);
-    vec2 f = fract(x);
-    float m_dist = 1.0;
-    for(int j=-1; j<=1; j++)
-    for(int i=-1; i<=1; i++) {
-        vec2 g = vec2(float(i),float(j));
-        vec2 o = random2(n + g);
-        o = 0.5 + 0.5*sin( time + 6.2831*o );
-        vec2 r = g + o - f;
-        float d = dot(r,r);
-        m_dist = min(m_dist, d);
+float cellular(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float md = 8.0;
+    for(int y=-1; y<=1; y++)
+    for(int x=-1; x<=1; x++) {
+        vec2 g = vec2(float(x), float(y));
+        vec2 o = hash22(i + g);
+        o = 0.5 + 0.5 * sin(time + TAU * o);
+        float d = length(g - f + o);
+        if(d < md) md = d;
     }
-    return sqrt(m_dist);
+    return md;
+}
+
+// SDFs
+float sdBox(vec2 p, vec2 b) {
+    vec2 d = abs(p)-b;
+    return length(max(d,0.0)) + min(max(d.x,d.y),0.0);
+}
+float sdHex(vec2 p, float r) {
+    const vec3 k = vec3(-0.866025404, 0.5, 0.577350269);
+    p = abs(p);
+    p -= 2.0 * min(dot(k.xy, p), 0.0) * k.xy;
+    p -= vec2(clamp(p.x, -k.z * r, k.z * r), r);
+    return length(p) * sign(p.y);
+}
+
+// Color palettes (Inigo Quilez)
+vec3 pal( in float t, in vec3 a, in vec3 b, in vec3 c, in vec3 d ) {
+    return a + b*cos( TAU*(c*t+d) );
 }
 void main() {
-    vec2 st = gl_FragCoord.xy / resolution.xy;
-    st.x *= resolution.x / resolution.y;
-    vec2 p = st - 0.5; float a = atan(p.y, p.x); float r = length(p); p = vec2(a/3.14, r * 4.94);
-    float val1 = sin(p.x * 12.55 + time * 1.05) * cos(p.y * 8.31 - time * 0.84);
-    p += 0.64;
-    float val2 = sin(p.x * 19.93 + time * 2.21) * cos(p.y * 16.72 - time * 1.77);
-    float val = val1 * val2;
-    val = step(0.0, val);
-    vec3 col = mod(val * 5.04, 1.0) * vec3(0.58, 0.86, 0.33);
+    vec2 uv = (gl_FragCoord.xy - 0.5 * resolution.xy) / min(resolution.x, resolution.y);
+    vec2 p0 = uv;
+    p0.y += cos(p0.x * 14.0 - time * 4.4) * 0.06;
+    p0 *= 1.0 + 0.67 * sin(length(p0) * 14.6 - time * 6.6);
+    vec2 p1 = uv;
+    { float fov_1_0 = 0.5; vec3 p3_1_0 = vec3(p1.x, fov_1_0, p1.y - 0.20); p1 = vec2(p3_1_0.x/p3_1_0.z, p3_1_0.y/p3_1_0.z); p1.y += time * 2.9; }
+    p1 = fract(p1 * 2.2) - 0.5;
+    { float a_1_2 = atan(p1.y, p1.x); float r_1_2 = length(p1); a_1_2 = mod(a_1_2, TAU / 7.7) - PI / 5.5; p1 = vec2(cos(a_1_2), sin(a_1_2)) * r_1_2; }
+    { float r_1_3 = length(p1); float a_1_3 = atan(p1.y, p1.x); p1 = vec2(log(r_1_3) - time * 0.20, a_1_3 * 1.0 / PI); }
+    vec2 p2 = uv;
+    p2.x += sin(p2.y * 5.8 + time * 3.5) * 0.06;
+    p2 *= 1.0 + 0.54 * sin(length(p2) * 8.7 - time * 6.7);
+    p2.x += sin(p2.y * 13.5 + time * 2.3) * 0.15;
+    float v = mod(mix(fract(length(p0) * 9.6 - time * 2.8), (
+            sin(length(p1 - vec2(-0.59, -0.31)) * 15.4 - time * 3.4) + sin(length(p1 - vec2(-0.02, 0.02)) * 27.1 - time * 2.4) + sin(length(p1 - vec2(0.21, -0.10)) * 24.8 - time * 3.1) + sin(length(p1 - vec2(-0.72, -0.76)) * 39.7 - time * 3.2) + sin(length(p1 - vec2(0.63, -0.26)) * 26.0 - time * 8.8) + sin(length(p1 - vec2(0.58, 0.19)) * 35.0 - time * 6.2)
+        ) / 6.0, 0.5 + 0.5 * sin(time)), sdBox(p2, vec2(0.25, 0.37)) + 0.001);
+    v = pow(abs(v), 0.53);
+    v = smoothstep(0.04, 0.78, v);
+    vec3 col = pal(v + time * 0.14, vec3(0.8, 0.5, 0.4), vec3(0.2, 0.4, 0.2), vec3(2.0, 1.0, 1.0), vec3(0.0, 0.25, 0.25));
+    col.r = fract(col.r + sin(uv.y * 50.0 + time) * 0.1);
+    col.g = fract(col.g + cos(uv.x * 40.0 + time) * 0.1);
     fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }
