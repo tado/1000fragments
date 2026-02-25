@@ -2,6 +2,6 @@
 
 This repository contains 1000 fragment shaders newly created using generative AI, based on 100 fragment shaders previously made by hand. Built with Claude Sonnet 4.6.
 
-- Instructions to Claude: [CLAUDE.md](./CLAUDE.md)
-- Work log: [Claude-tasks.md](./Claude-tasks.md)
+- Instructions to Claude: [CLAUDE.md](https://github.com/tado/1000fragments/blob/main/CLAUDE.md)
+- Work log: [Claude-tasks.md](https://github.com/tado/1000fragments/blob/main/Claude-task.md)
 - Generated shaders: [youtube](https://youtu.be/BcXQp1HI0L0?si=LMPytlGijesxMWCK)
