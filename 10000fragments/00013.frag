@@ -2,46 +2,29 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-float random(in vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) *
-        43758.5453123);
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+vec2 hash22(vec2 p){
+    return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+}
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
 }
 
-float noise(in vec2 st) {
-    vec2 i = floor(st);
-    vec2 f = fract(st);
 
-    // Four corners in 2D of a tile
-    float a = random(i);
-    float b = random(i + vec2(1.0, 0.0));
-    float c = random(i + vec2(0.0, 1.0));
-    float d = random(i + vec2(1.0, 1.0));
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) +
-        (c - a) * u.y * (1.0 - u.x) +
-        (d - b) * u.x * u.y;
-}
-#define OCTAVES 4
-float fbm(in vec2 st) {
-    float value = 0.0;
-    float amplitude = .5;
-    float frequency = 0.;
-    for (int i = 0 ; i < OCTAVES ; i ++) {
-        value += amplitude * noise(st);
-        st *= 2.;
-        amplitude *= .5;
-    }
-    return value;
-}
-
-void main() {
-    vec2 st = gl_FragCoord.xy / resolution.xy;
-    st.x *= resolution.x / resolution.y;
-    vec3 color = vec3(0.0);
-    color += fbm(st * 18.3 + vec2(time * 7.1, time * 10.3));
-    color *= fbm(st * 12.2 + vec2(time * 5.2, time * 10.2));
-    color *= fbm(st * 10.2 + vec2(time * 3.3, time * 10.1));
-    color = mod(color * 12.0, 1.0);
-    vec4 fcolor = vec4(color, 1.0);
-    fragColor = TDOutputSwizzle(fcolor);
+void main(){
+	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
+	p.x *= resolution.x / resolution.y;
+	p *= 1.96;
+	float acc = 0.0;
+	for(int ri = 0; ri < 8; ri++){
+		float fi = float(ri);
+		float cyc = time * 0.56 + hash21(vec2(fi, 1.7));
+		float age = fract(cyc);
+		vec2 dp = (hash22(vec2(fi, floor(cyc))) - 0.5) * 1.74;
+		float dist = length(p - dp);
+		acc += sin((dist - age * 1.31) * 8.28) * (1.0 - age) * exp(-dist * 1.02);
+	}
+	vec3 col = palette(acc * 0.58 + time * 0.19, vec3(0.48, 0.48, 0.54), vec3(0.39, 0.49, 0.49), vec3(0.73, 1.14, 0.95), vec3(0.42, 0.14, 0.00));
+	col = clamp((col - 0.5) * 1.62 + 0.5, 0.0, 1.0);
+	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

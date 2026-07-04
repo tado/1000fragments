@@ -2,40 +2,34 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-vec4 mod289(vec4 x){ return x - floor(x * (1.0 / 289.0)) * 289.0; }
-vec4 perm(vec4 x){ return mod289(((x * 34.0) + 1.0) * x); }
-float noise3(vec3 p){
-    vec3 a = floor(p);
-    vec3 d = p - a;
-    d = d * d * (3.0 - 2.0 * d);
-    vec4 b = a.xxyy + vec4(0.0, 1.0, 0.0, 1.0);
-    vec4 k1 = perm(b.xyxy);
-    vec4 k2 = perm(k1.xyxy + b.zzww);
-    vec4 c = k2 + a.zzzz;
-    vec4 k3 = perm(c);
-    vec4 k4 = perm(c + 1.0);
-    vec4 o1 = fract(k3 * (1.0 / 41.0));
-    vec4 o2 = fract(k4 * (1.0 / 41.0));
-    vec4 o3 = o2 * d.z + o1 * (1.0 - d.z);
-    vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
-    return o4.y * d.y + o4.x * (1.0 - d.y);
+vec3 hue(float h){
+    return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
 }
 
-float field(vec2 p, float t, float ph){
+float fieldA(vec2 p, float t, float ph){
     float v;
-    v = noise3(vec3(p * 1.50, t * 2.08 + ph)) * 2.0 - 1.0;
+    vec2 pk = p * 4.38;
+    pk.x += step(0.5, fract(pk.y * 0.5)) * 0.5;
+    vec2 pf = fract(pk) - 0.5;
+    float rad = 0.24 + 0.07 * sin(t * 1.67 + floor(pk.y) * 1.7 + ph);
+    v = (1.0 - smoothstep(rad - 0.1, rad, length(pf))) * 2.0 - 1.0;
+    return v;
+}
+float fieldB(vec2 p, float t, float ph){
+    float v;
+    float ga = atan(p.y, p.x); float gr = length(p) + 0.001;
+    float arm = sin(log(gr) * 4.65 + ga * 4.0 - t * 1.07 + ph);
+    v = arm * exp(-gr * 1.41);
     return v;
 }
 
 void main(){
-	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
-	p.x *= resolution.x / resolution.y;
-	{ float fr = length(p); p *= 1.0 + 0.75 * fr * fr; }
-	p += vec2(0.89, -0.49) * sin(length(p) * 4.94 - time * 0.53) * 0.10;
-	p *= 3.37;
-	{ float ka = atan(p.y, p.x); float kr = length(p); float kn = 6.0; ka = mod(ka, 6.2831853 / kn); ka = abs(ka - 3.1415927 / kn); p = kr * vec2(cos(ka), sin(ka)); }
-	vec3 col = vec3(field(p, time, 0.0), field(p, time, 0.87), field(p, time, 1.74));
-	col = 0.5 + 0.5 * col;
-	col = fract(col * 2.06);
+	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
+	vec2 q1 = p; vec2 q2 = p;
+	q1 *= 1.0 + 0.39 * sin(time * 2.66);
+	float d1 = fieldA(q1, time, 0.0);
+	float d2 = fieldB(q2, time, 1.71);
+	float d = min(d1, d2);
+	vec3 col = hue(d * 0.42 + time * 0.04);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

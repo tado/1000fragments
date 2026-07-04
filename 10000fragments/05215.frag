@@ -2,25 +2,35 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
     return a + b * cos(6.28318 * (c * t + d));
 }
 
 float field(vec2 p, float t, float ph){
     float v;
-    v = 0.25 * (sin(p.x * 13.16 + t * 2.75 + ph) + sin(p.y * 2.83 - t * 2.75 + ph)
-        + sin((p.x + p.y) * 7.51 + t * 2.75 + ph) + sin(length(p) * 8.84 - t * 2.75 + ph));
+    vec2 dp = fract(p * 6.45) - 0.5;
+    float rad = 0.21 + 0.12 * sin(t * 1.52 + ph);
+    v = (1.0 - smoothstep(0.0, rad, length(dp))) * 2.0 - 1.0;
+    return v;
+}
+float field2(vec2 p, float t, float ph){
+    float v;
+    float ma = sin(length(p - vec2(0.54, 0.0)) * 16.47 - t * 1.77 + ph);
+    float mb = sin(length(p + vec2(0.54, 0.0)) * 28.71 - t * 1.78 + ph);
+    v = ma * mb;
     return v;
 }
 
 void main(){
-	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
-	for(int fo = 0; fo < 5; fo++){ p = abs(p) - 0.48; p = rot2(2.19) * p; }
-	p += vec2(-0.98, 0.36) * sin(length(p) * 4.22 - time * 1.99) * 0.13;
-	p = rot2(length(p) * 2.52 + time * 0.62) * p;
-	float d = field(p, time, 0.0);
-	vec3 col = palette(d * 0.67 + time * 0.20, vec3(0.57, 0.41, 0.53), vec3(0.39, 0.44, 0.40), vec3(1.20, 1.28, 1.30), vec3(0.63, 0.68, 0.19));
-	col = fract(col * 2.08);
+	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+	{ float ka = atan(p.y, p.x); float kr = length(p); float kn = 4.0; ka = mod(ka, 6.2831853 / kn); ka = abs(ka - 3.1415927 / kn); p = kr * vec2(cos(ka), sin(ka)); }
+	p = mix(p, p.yx, 0.5 + 0.5 * sin(time * 1.64));
+	p *= 3.09;
+	p = (floor(p * 7.1) + 0.5) / 7.1;
+	float d1 = field(p, time, 0.0);
+	float d2 = field2(p, time, 0.67);
+	float d = abs(d1 - d2);
+	vec3 col = palette(d * 1.63 + time * 0.14, vec3(0.50, 0.59, 0.59), vec3(0.40, 0.33, 0.38), vec3(0.87, 1.24, 1.23), vec3(0.48, 0.75, 0.12));
+	col *= 0.84 + 0.18 * sin(gl_FragCoord.y * 1.32 + time * 17.79);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

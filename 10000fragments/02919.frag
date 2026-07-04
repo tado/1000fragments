@@ -2,35 +2,24 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
     return a + b * cos(6.28318 * (c * t + d));
 }
 
-float field(vec2 p, float t, float ph){
-    float v;
-    vec2 cq = p * 7.34 + vec2(t * 0.39, -t * 0.39) + ph;
-    v = sign(sin(cq.x) * sin(cq.y));
-    return v;
-}
-float field2(vec2 p, float t, float ph){
-    float v;
-    float ms = 0.0;
-    for(int mi = 0; mi < 14; mi++){ float mf = float(mi);
-        vec2 mm = vec2(sin(t * 1.08 * sin(mf + 3.0) + ph), cos(t * 1.08 * cos(mf + 3.0) + ph));
-        ms += 0.089 / length(p - mm); }
-    v = ms / (1.0 + abs(ms)) * 2.0 - 1.0;
-    return v;
-}
 
 void main(){
 	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
-	p *= 1.92;
-	{ float lr = log(length(p) + 0.001); float la = atan(p.y, p.x); p = vec2(la * 2.38, lr * 2.72 + time * -0.45); }
-	{ float ka = atan(p.y, p.x); float kr = length(p); float kn = 3.0; ka = mod(ka, 6.2831853 / kn); ka = abs(ka - 3.1415927 / kn); p = kr * vec2(cos(ka), sin(ka)); }
-	float d1 = field(p, time, 0.0);
-	float d2 = field2(p, time, 1.47);
-	float d = max(d1, d2);
-	vec3 col = palette(d * 1.46 + time * 0.01, vec3(0.59, 0.44, 0.52), vec3(0.47, 0.46, 0.42), vec3(1.19, 0.97, 1.28), vec3(0.87, 0.85, 0.24));
-	col = fract(col * 1.04);
+	p *= 0.92;
+	p = rot2(time * -0.98) * p;
+	vec2 gp = p * 6.80;
+	vec2 id = floor(gp); vec2 gv = fract(gp) - 0.5;
+	float rnd = hash21(id);
+	if(rnd < 0.5) gv.x = -gv.x;
+	float ad = min(abs(length(gv - vec2(0.5)) - 0.5), abs(length(gv + vec2(0.5)) - 0.5));
+	float v = sin(ad * 19.49 - time * 6.80 + rnd * 6.2831853);
+	vec3 col = palette(v * 1.05 + time * 0.14, vec3(0.43, 0.58, 0.56), vec3(0.42, 0.34, 0.47), vec3(1.13, 1.38, 1.19), vec3(0.30, 0.17, 0.61));
+	col = pow(clamp(col, 0.0, 1.0), vec3(1.76));
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

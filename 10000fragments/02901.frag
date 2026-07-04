@@ -3,31 +3,24 @@ uniform vec2 resolution;
 out vec4 fragColor;
 
 mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise2(vec2 p){
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash21(i + vec2(0.0, 0.0)), hash21(i + vec2(1.0, 0.0)), u.x),
-               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
+vec2 hash22(vec2 p){
+    return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
 }
 
-float field(vec2 p, float t, float ph){
-    float v;
-    float fs = 0.0, famp = 0.5; vec2 fq = p * 5.57 + ph;
-    for(int fi = 0; fi < 4; fi++){ fs += famp * noise2(fq + t * 0.62); fq *= 2.0; famp *= 0.5; }
-    v = fs * 2.0 - 1.0;
-    return v;
-}
 
 void main(){
-	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
-	p.x *= resolution.x / resolution.y;
-	p = rot2(time * -1.10) * p;
-	{ p = vec2(atan(p.y, p.x) * 1.52, length(p) * 3.57 - time * 0.10); }
-	p += vec2(0.08, -0.42) * sin(length(p) * 2.80 - time * 1.04) * 0.29;
-	for(int fo = 0; fo < 5; fo++){ p = abs(p) - 0.59; p = rot2(1.19) * p; }
-	vec3 col = vec3(field(p, time, 0.0), field(p, time, 0.73), field(p, time, 1.46));
-	col = 0.5 + 0.5 * col;
-	col = mod(col * 2.29, 1.0);
+	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+	p *= 1.64;
+	p = rot2(time * -0.66) * p;
+	vec3 col = vec3(0.014, 0.044, 0.034);
+	for(int gi = 0; gi < 4; gi++){
+		float fi = float(gi);
+		vec2 hc = hash22(vec2(fi * 1.3, fi * 7.7));
+		vec2 q = (hc - 0.5) * 1.62 + 0.34 * vec2(sin(time * 2.77 + hc.x * 6.2831853), cos(time * 2.84 + hc.y * 6.2831853));
+		float gd = abs(length(p - q) - 0.13);
+		col += (0.5 + 0.5 * cos(vec3(0.0, 2.094, 4.188) + fi * 0.52 + time * 1.31)) * (0.022 / (gd + 0.025));
+	}
+	col = col / (1.0 + col);
+	col *= 0.89 + 0.15 * sin(gl_FragCoord.y * 1.25 + time * 13.58);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

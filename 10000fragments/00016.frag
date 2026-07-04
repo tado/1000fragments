@@ -2,50 +2,21 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-float random (in vec2 st) {
-    return fract(sin(dot(st.xy,
-                         vec2(12.9898,78.233)))
-                * 43758.5453123);
-}
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
-float noise(vec2 st) {
-    vec2 i = floor(st);
-    vec2 f = fract(st);
-    vec2 u = f*f*(3.0-2.0*f);
-    return mix( mix( random( i + vec2(0.0,0.0) ),
-                     random( i + vec2(1.0,0.0) ), u.x),
-                mix( random( i + vec2(0.0,1.0) ),
-                     random( i + vec2(1.0,1.0) ), u.x), u.y);
-}
 
-mat2 rotate2d(float angle){
-    return mat2(cos(angle),-sin(angle),
-                sin(angle),cos(angle));
-}
-
-float lines(in vec2 pos, float b){
-    float scale = 10.0;
-    pos *= scale;
-    return smoothstep(0.0,
-                    .5+b*.5,
-                    abs((sin(pos.x*3.1415)+b*2.0))*.5);
-}
-
-void main() {
-    vec2 st = gl_FragCoord.xy/resolution.xy;
-    st.x *= resolution.x/resolution.y;
-    vec2 pos = st.yx*vec2(1.5,3.0);
-    float pattern = 1.0;
-    pos = rotate2d( noise(pos + time * 1.0) ) * pos * 2.0;
-    pattern = lines(pos,.5);
-
-    vec2 pos2 = st.yx*vec2(1.0,3.0);
-    pos2 = rotate2d( noise(pos2 + time + 500.0) ) * pos2 * 3.0;
-    float pattern2 = lines(pos2, 0.2);
-
-    vec2 pos3 = st.yx*vec2(1.7, 2.5);
-    pos3 = rotate2d( noise(pos3 + time + 1000.0) ) * pos3 * 5.0;
-    float pattern3 = lines(pos3, 0.2);
-    vec4 color = vec4(vec3(3.0 * (pattern - pattern2 - pattern3)) * 2.0,1.0);
-    fragColor = TDOutputSwizzle(color);
+void main(){
+	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
+	p.x *= resolution.x / resolution.y;
+	p *= 2.58;
+	p = rot2(time * 0.36) * p;
+	vec2 gp = p * 6.83;
+	vec2 id = floor(gp); vec2 gv = fract(gp) - 0.5;
+	float rnd = hash21(id);
+	vec2 sv = rot2(floor(rnd * 4.0) * 0.7853982 + time * 1.36 * (step(0.5, hash21(id + 3.3)) * 2.0 - 1.0)) * gv;
+	float v = sin(sv.x * 9.83 + rnd * 6.2831853 + time * 3.15);
+	float cc = clamp(0.5 + 0.5 * v, 0.0, 1.0);
+	vec3 col = mix(vec3(0.23, 0.18, 0.11), vec3(0.70, 0.74, 0.69), cc);
+	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

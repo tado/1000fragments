@@ -9,19 +9,19 @@ vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
 
 float field(vec2 p, float t, float ph){
     float v;
-    float ma = sin(length(p - vec2(0.42, 0.0)) * 23.31 - t * 1.99 + ph);
-    float mb = sin(length(p + vec2(0.42, 0.0)) * 34.46 - t * 1.99 + ph);
-    v = ma * mb;
+    float lv = length(p) * 3.91 - t * 0.39;
+    v = sin(floor(lv * 3.9) / 3.9 * 6.2831853 + ph);
     return v;
 }
 
 void main(){
 	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p += vec2(0.27, 0.30) * sin(length(p) * 2.92 - time * 1.58) * 0.37;
-	p = rot2(1.20) * p;
-	p = rot2(p.y * 2.53 + time * 0.54) * p;
-	float d = field(p, time, 0.0);
-	vec3 col = palette(d * 1.19 + time * 0.02, vec3(0.54, 0.44, 0.58), vec3(0.31, 0.45, 0.41), vec3(1.29, 1.09, 1.35), vec3(0.80, 0.60, 0.70));
-	col = pow(clamp(col, 0.0, 1.0), vec3(1.10));
+	p *= 1.61;
+	float d = 0.5 + 0.5 * field(p, time, 0.0);
+	vec2 hq = rot2(0.72) * p * 9.13;
+	vec2 hf = fract(hq) - 0.5;
+	float rad = clamp(d, 0.0, 1.0) * 0.73;
+	float v = smoothstep(rad, rad - 0.16, length(hf));
+	vec3 col = palette(d * 0.88 + time * 0.07, vec3(0.53, 0.58, 0.58), vec3(0.45, 0.40, 0.43), vec3(1.31, 1.34, 1.11), vec3(0.01, 0.47, 0.05)) * v;
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

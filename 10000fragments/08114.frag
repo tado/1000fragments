@@ -4,20 +4,23 @@ out vec4 fragColor;
 
 float field(vec2 p, float t, float ph){
     float v;
-    float xs = 0.0;
-    for(int xi = 1; xi < 4; xi++){ float jf = float(xi);
-        vec2 im = vec2(sin(t * 0.41 + jf * 4.0), cos(t * 0.21 * jf)) * 0.71;
-        xs += sin(length(p - im) * 199.14 - t * 4.98 + ph) * 0.5; }
-    v = xs / (1.0 + abs(xs));
+    float md = 10.0;
+    for(int fi = 0; fi < 40; fi++){ float ff = float(fi) + 1.0;
+        float ang = ff * 2.3999632 + t * 0.70 + ph * 0.2;
+        vec2 sp = sqrt(ff) * 0.24 * vec2(cos(ang), sin(ang));
+        md = min(md, length(p - sp)); }
+    v = exp(-md * 7.89) * 2.0 - 1.0;
     return v;
 }
 
 void main(){
 	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
 	p.x *= resolution.x / resolution.y;
-	p *= 1.27;
-	vec3 col = vec3(field(p, time, 0.0), field(p, time, 1.04), field(p, time, 2.08));
-	col = 0.5 + 0.5 * col;
-	col = clamp((col - 0.5) * 2.01 + 0.5, 0.0, 1.0);
+	p *= 1.23;
+	p *= 2.78;
+	{ p = vec2(atan(p.y, p.x) * 2.76, length(p) * 2.35 - time * 0.72); }
+	float d = field(p, time, 0.0);
+	vec3 col = vec3(0.79, 0.68, 0.35) * (0.14 / (abs(d) + 0.06));
+	col = col / (1.0 + col);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

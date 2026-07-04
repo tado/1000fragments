@@ -2,24 +2,17 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-
-float field(vec2 p, float t, float ph){
-    float v;
-    vec2 dp = fract(p * 6.28) - 0.5;
-    float rad = 0.35 + 0.12 * sin(t * 1.01 + ph);
-    v = (1.0 - smoothstep(0.0, rad, length(dp))) * 2.0 - 1.0;
-    return v;
-}
 
 void main(){
-	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
-	p.x *= resolution.x / resolution.y;
-	p *= 1.92;
-	p = rot2(length(p) * -3.85 + time * 0.77) * p;
-	p = abs(p);
-	{ p = vec2(atan(p.y, p.x) * 1.48, length(p) * 4.60 - time * 0.34); }
-	float d = 0.5 + 0.5 * field(p, time, 0.0);
-	vec3 col = mix(vec3(0.24, 0.30, 0.20), vec3(0.89, 0.92, 0.74), d);
+	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
+	p *= 2.24;
+	vec3 col = vec3(0.041, 0.033, 0.051);
+	for(int gi = 0; gi < 6; gi++){
+		float fi = float(gi);
+		vec2 q = vec2(cos(fi * 2.15 + time * 1.45), sin(fi * 2.15 + time * 1.45)) * (0.35 + 0.19 * sin(fi * 1.7 + time * 0.71));
+		float gd = abs(length(p - q) - 0.28);
+		col += (0.5 + 0.5 * cos(vec3(0.0, 2.094, 4.188) + fi * 1.94 + time * 1.18)) * (0.016 / (gd + 0.017));
+	}
+	col = col / (1.0 + col);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

@@ -2,24 +2,34 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-vec3 hue(float h){
-    return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
 }
 
-float field(vec2 p, float t, float ph){
-    float v;
-    vec2 z = p * 1.28; vec2 jc = vec2(-0.09 + 0.3 * sin(t * 0.56 + ph), 0.36 + 0.3 * cos(t * 0.56 + ph));
-    float jit = 0.0;
-    for(int ji = 0; ji < 20; ji++){ z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + jc; if(dot(z, z) > 4.0) break; jit += 1.0; }
-    v = jit / float(20) * 2.0 - 1.0;
-    return v;
+float map(vec3 q){
+	q.z += time * 1.65;
+	vec3 mq = mod(q, 2.57) - 1.29;
+	mq.xy = rot2(time * -0.90) * mq.xy;
+	vec3 b = abs(mq) - vec3(0.29);
+	return length(max(b, vec3(0.0))) + min(max(b.x, max(b.y, b.z)), 0.0);
 }
 
 void main(){
 	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	{ float fr = length(p); p *= 1.0 + 0.42 * fr * fr; }
-	float d = field(p, time, 0.0);
-	vec3 col = hue(d * 1.55 + time * 0.16);
-	col = floor(clamp(col, 0.0, 1.0) * 4.0) / 4.0;
+	vec3 ro = vec3(1.29, 1.29, -3.0);
+	vec3 rd = normalize(vec3(p, 1.33));
+	rd.xy = rot2(time * -0.29) * rd.xy;
+	float tt = 0.0; float it = 0.0;
+	for(int i = 0; i < 68; i++){
+		vec3 pos = ro + rd * tt;
+		float dm = map(pos);
+		if(dm < 0.002 || tt > 14.0) break;
+		tt += dm * 0.83;
+		it += 1.0;
+	}
+	float fog = exp(-tt * 0.44);
+	vec3 col = palette(tt * 0.33 + time * 0.28, vec3(0.54, 0.43, 0.41), vec3(0.38, 0.46, 0.40), vec3(1.09, 0.78, 1.02), vec3(0.98, 0.56, 0.11)) * fog;
+	col += vec3(0.55, 0.47, 0.61) * (it / 68.0) * 0.33;
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

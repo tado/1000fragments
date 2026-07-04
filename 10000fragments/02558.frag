@@ -2,22 +2,16 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-float field(vec2 p, float t, float ph){
-    float v;
-    float xs = 0.0;
-    for(int xi = 1; xi < 8; xi++){ float jf = float(xi);
-        vec2 im = vec2(sin(t * 0.64 + jf * 4.0), cos(t * 0.46 * jf)) * 0.90;
-        xs += sin(length(p - im) * 156.18 - t * 5.40 + ph) * 0.5; }
-    v = xs / (1.0 + abs(xs));
-    return v;
-}
 
 void main(){
-	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
-	p.x *= resolution.x / resolution.y;
-	p += vec2(-0.80, 0.74) * sin(length(p) * 3.72 - time * 1.80) * 0.40;
-	vec3 col = vec3(field(p, time, 0.0), field(p, time, 0.59), field(p, time, 1.18));
-	col = 0.5 + 0.5 * col;
-	col = mod(col * 1.38, 1.0);
+	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+	vec3 col = vec3(0.017, 0.031, 0.044);
+	for(int ci = 0; ci < 29; ci++){
+		float ft = time * 0.66 - float(ci) * 0.12;
+		vec2 cp = cos(ft * 4.0) * 0.51 * vec2(cos(ft), sin(ft));
+		float fade = 1.0 - float(ci) / 29.0;
+		col += (0.5 + 0.5 * cos(vec3(0.0, 2.094, 4.188) + ft * 0.85)) * (0.0104 / (length(p - cp) + 0.025)) * fade;
+	}
+	col = col / (1.0 + col);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

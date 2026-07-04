@@ -2,48 +2,27 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-float random (in vec2 st) {
-    return fract(sin(dot(st.xy,
-                         vec2(12.9898,78.233)))*
-        43758.5453123);
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
 }
 
-float noise (in vec2 st) {
-    vec2 i = floor(st);
-    vec2 f = fract(st);
 
-    // Four corners in 2D of a tile
-    float a = random(i);
-    float b = random(i + vec2(1.0, 0.0));
-    float c = random(i + vec2(0.0, 1.0));
-    float d = random(i + vec2(1.0, 1.0));
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) +
-            (c - a)* u.y * (1.0 - u.x) +
-            (d - b) * u.x * u.y;
-}
+void main(){
+	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+	p *= 0.88;
+	float sa = atan(p.y, p.x);
+	float sr = length(p);
+	float m = 6.0;
+	float n1 = 1.89 + 0.42 * sin(time * 0.64);
+	float n2 = 0.61 + 0.59 * cos(time * 1.42);
+	float t1 = pow(abs(cos(m * sa * 0.25)), n2);
+	float t2 = pow(abs(sin(m * sa * 0.25)), n2);
+	float rr = pow(t1 + t2, -1.0 / max(n1, 0.2)) * 0.43;
+	float d = sr - rr;
+	float v = 1.0 - smoothstep(0.0, 0.13, d);
 
-#define OCTAVES 4
-float fbm (in vec2 st) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 0.0;
-    for (int i = 0; i < OCTAVES; i++) {
-        value += amplitude * noise(st);
-        st *= 2.;
-        amplitude *= .5;
-    }
-    return value;
-}
-
-void main() {
-    vec2 st = gl_FragCoord.xy/resolution.xy;
-    st.x *= resolution.x/resolution.y;
-    vec3 color = vec3(0.0);
-    color += fbm(st * 2.3 + vec2(time * 0.1, time * 0.3)) * vec3(2.0, 0.5, 0.5);
-    color += fbm(st * 2.2 + vec2(time * 0.2, time * 0.2)) * vec3(0.5, 0.5, 2.5);
-    color += fbm(st * 2.1 + vec2(time * 0.3, time * 0.1)) * vec3(0.5, 1.5, 0.5);
-    color = mod(color * 12.0, 1.0) * 1.5;
-    vec4 fcolor = vec4(color, 1.0);
-    fragColor = TDOutputSwizzle(fcolor);
+	vec3 col = palette(v * 1.36 + sr * 0.70 * 0.47 + time * 0.15, vec3(0.48, 0.46, 0.47), vec3(0.44, 0.40, 0.35), vec3(1.15, 1.05, 1.12), vec3(0.55, 0.30, 0.89));
+	col *= 1.0 - smoothstep(0.0, 0.04, d) * 0.67;
+	col = floor(clamp(col, 0.0, 1.0) * 4.0) / 4.0;
+	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

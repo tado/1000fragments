@@ -2,35 +2,23 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
-    return a + b * cos(6.28318 * (c * t + d));
-}
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 
-float field(vec2 p, float t, float ph){
-    float v;
-    float ma = sin(length(p - vec2(0.22, 0.0)) * 27.19 - t * 1.48 + ph);
-    float mb = sin(length(p + vec2(0.22, 0.0)) * 39.25 - t * 1.48 + ph);
-    v = ma * mb;
-    return v;
-}
-float field2(vec2 p, float t, float ph){
-    float v;
-    vec2 z = p * 0.83; vec2 jc = vec2(-0.70 + 0.3 * sin(t * 1.46 + ph), -0.07 + 0.3 * cos(t * 1.46 + ph));
-    float jit = 0.0;
-    for(int ji = 0; ji < 27; ji++){ z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + jc; if(dot(z, z) > 4.0) break; jit += 1.0; }
-    v = jit / float(27) * 2.0 - 1.0;
-    return v;
-}
 
 void main(){
-	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
-	p *= 1.08;
-	p = abs(p) - 0.74;
-	for(int wi = 0; wi < 4; wi++){ float wf = float(wi) + 1.0; p.x += 0.20 / wf * sin(wf * 2.31 * p.y + time * 2.00); p.y += 0.39 / wf * cos(wf * 1.71 * p.x + time * 0.92); }
-	{ float fr = length(p); p *= 1.0 + 0.52 * fr * fr; }
-	float d1 = field(p, time, 0.0);
-	float d2 = field2(p, time, 0.24);
-	float d = d1 + d2;
-	vec3 col = palette(d * 0.85 + time * 0.24, vec3(0.59, 0.54, 0.46), vec3(0.34, 0.44, 0.40), vec3(1.01, 0.90, 0.83), vec3(0.81, 0.23, 0.07));
+	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+	p *= 2.18;
+	vec2 z = p;
+	vec2 c = vec2(-0.81 + 0.27 * sin(time * 0.88), 0.52 + 0.20 * cos(time * 1.03));
+	float trap = 10.0;
+	for(int oi = 0; oi < 8; oi++){
+		z = abs(z);
+		z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+		trap = min(trap, length(z));
+	}
+	float v = exp(-trap * 5.06);
+	vec3 col = vec3(0.90, 0.67, 0.55) * (0.17 / (abs(v * 2.73) + 0.07));
+	col = col / (1.0 + col);
+	col += (hash21(gl_FragCoord.xy + fract(time) * 100.0) - 0.5) * 0.10;
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }
