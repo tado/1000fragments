@@ -2,26 +2,39 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
-    return a + b * cos(6.28318 * (c * t + d));
+float random (in vec2 st) {
+    return fract(sin(dot(st.xy,
+                         vec2(12.9898,78.233)))
+                * 43758.5453123);
 }
 
+void main(void){
+    vec2 m;
+    float rt = 0.0;
+    for(float i = 0.0; i < 2.0; i+=1.0){
+        m = vec2(sin(time * 5.0 * i) * 0.9, cos(time * 5.2 + i) * 0.8);
+        vec2 pp = vec2(random(m), random(m*2.0)) * 4.0 - 2.0;
+        vec2 pos = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+        rt += 0.1 / length(pp - pos);
+    }
+    vec3 r = vec3 (rt) * vec3(3.0, 0.5, 0.0);
 
-void main(){
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p *= 1.37;
-	p = rot2(time * -0.40) * p;
-	float sa = atan(p.y, p.x);
-	float sr = length(p);
-	float m = 7.0;
-	float n1 = 0.77 + 0.68 * sin(time * 1.11);
-	float n2 = 1.21 + 0.59 * cos(time * 1.10);
-	float t1 = pow(abs(cos(m * sa * 0.25)), n2);
-	float t2 = pow(abs(sin(m * sa * 0.25)), n2);
-	float rr = pow(t1 + t2, -1.0 / max(n1, 0.2)) * 0.63;
-	float d = sr - rr;
-	float v = d;
-	vec3 col = palette(v * 0.69 + time * 0.16, vec3(0.40, 0.50, 0.59), vec3(0.50, 0.33, 0.38), vec3(0.80, 1.34, 0.98), vec3(1.00, 0.55, 0.78));
-	fragColor = TDOutputSwizzle(vec4(col, 1.0));
+     float gt = 0.0;
+    for(float i = 0.0; i < 2.0; i+=1.0){
+        m = vec2(sin(time * 5.0 * i + 500.0) * 0.9, cos(time * 5.2 + i) * 0.8);
+        vec2 pp = vec2(random(m * 10.0), random(m * 20.0)) * 4.0 - 2.0;
+        vec2 pos = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+        gt += 0.1 / length(pp - pos);
+    }
+    vec3 g = vec3 (gt) * vec3(0.0, 3.0, 0.5);
+    float bt = 0.0;
+    for(float i = 0.0; i < 2.0; i+=1.0){
+        m = vec2(sin(time * 5.0 * i + 1000.0) * 0.9, cos(time * 5.2 + i) * 0.8);
+        vec2 pp = vec2(random(m), random(m*2.0)) * 4.0 - 2.0;
+        vec2 pos = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
+        bt += 0.1 / length(pp - pos);
+    }
+    vec3 b = vec3 (bt) * vec3(0.0, 0.5, 3.0);
+    vec4 color = vec4(vec3(r + g + b), 1.0);
+    fragColor = TDOutputSwizzle(color);
 }

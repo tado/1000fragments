@@ -4,7 +4,7 @@ out vec4 fragColor;
 
 vec4 mod289(vec4 x){ return x - floor(x * (1.0 / 289.0)) * 289.0; }
 vec4 perm(vec4 x){ return mod289(((x * 34.0) + 1.0) * x); }
-float vnoise3(vec3 p){
+float noise3(vec3 p){
     vec3 a = floor(p);
     vec3 d = p - a;
     d = d * d * (3.0 - 2.0 * d);
@@ -20,23 +20,18 @@ float vnoise3(vec3 p){
     vec2 o4 = o3.yw * d.x + o3.xz * (1.0 - d.x);
     return o4.y * d.y + o4.x * (1.0 - d.y);
 }
-vec3 hue(float h){
-    return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
-}
 
 float field(vec2 p, float t, float ph){
     float v;
-    v = vnoise3(vec3(p * 3.54, t * 1.08 + ph)) * 2.0 - 1.0;
+    v = noise3(vec3(p * 5.15, t * 1.86 + ph)) * 2.0 - 1.0;
     return v;
 }
 
 void main(){
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p *= 2.79;
-	p += vec2(0.28, 0.44) * sin(length(p) * 4.38 - time * 0.86) * 0.36;
-	{ float lr = log(length(p) + 0.001); float la = atan(p.y, p.x); p = vec2(la * 1.27, lr * 1.73 + time * -0.40); }
-	float d = field(p, time, 0.0);
-	vec3 col = hue(d * 1.94 + time * 0.12);
-	col *= 0.87 + 0.18 * sin(gl_FragCoord.y * 2.28 + time * 6.20);
+	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
+	p *= 1.95;
+	for(int wi = 0; wi < 6; wi++){ float wf = float(wi) + 1.0; p.x += 0.23 / wf * sin(wf * 1.92 * p.y + time * 1.83); p.y += 0.35 / wf * cos(wf * 2.75 * p.x + time * 0.66); }
+	vec3 col = vec3(field(p, time, 0.0), field(p, time, 0.52), field(p, time, 1.05));
+	col = 0.5 + 0.5 * col;
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

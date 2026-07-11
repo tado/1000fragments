@@ -2,30 +2,34 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float vnoise2(vec2 p){
-    vec2 i = floor(p), f = fract(p);
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash21(i + vec2(0.0, 0.0)), hash21(i + vec2(1.0, 0.0)), u.x),
-               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
 }
 
 float field(vec2 p, float t, float ph){
     float v;
-    float wr = length(p) + 0.18 * vnoise2(p * 3.47 + t * 1.09);
-    v = sin(wr * 20.25 - t * 2.88 + ph);
+    vec2 dp = fract(p * 6.53) - 0.5;
+    float rad = 0.33 + 0.12 * sin(t * 1.57 + ph);
+    v = (1.0 - smoothstep(0.0, rad, length(dp))) * 2.0 - 1.0;
+    return v;
+}
+float field2(vec2 p, float t, float ph){
+    float v;
+    vec2 z = p * 1.43; vec2 jc = vec2(-0.25 + 0.3 * sin(t * 1.22 + ph), 0.06 + 0.3 * cos(t * 1.22 + ph));
+    float jit = 0.0;
+    for(int ji = 0; ji < 26; ji++){ z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + jc; if(dot(z, z) > 4.0) break; jit += 1.0; }
+    v = jit / float(26) * 2.0 - 1.0;
     return v;
 }
 
 void main(){
 	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p += vec2(sin(time * 1.46), cos(time * 0.71)) * 0.18;
-	float an = atan(p.y, p.x);
-	float r = length(p) + 0.0001;
-	vec2 tv = vec2(an * 2.65 / 3.1415927, 0.91 / r - time * 1.84);
-	float d = field(tv, time, 0.0);
-	vec3 col = vec3(0.88, 0.92, 0.67) * (0.10 / (abs(d) + 0.09));
-	col = col / (1.0 + col);
-	col *= clamp(r * 2.86, 0.0, 1.0);
+	for(int fo = 0; fo < 3; fo++){ p = abs(p) - 0.52; p = rot2(1.16) * p; }
+	p = abs(p) - 0.78;
+	float d1 = field(p, time, 0.0);
+	float d2 = field2(p, time, 0.63);
+	float d = d1 + d2;
+	vec3 col = palette(d * 0.83 + time * 0.17, vec3(0.57, 0.43, 0.57), vec3(0.35, 0.42, 0.49), vec3(0.97, 1.29, 1.24), vec3(0.28, 0.26, 0.57));
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

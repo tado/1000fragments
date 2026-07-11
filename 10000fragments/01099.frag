@@ -3,37 +3,27 @@ uniform vec2 resolution;
 out vec4 fragColor;
 
 mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-vec3 hue(float h){
-    return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
 }
 
-float map(vec3 q){
-	float sc = 1.0;
-	for(int ki = 0; ki < 4; ki++){
-		q = abs(q) - vec3(0.57, 0.33, 0.45);
-		q.xy = rot2(0.86 + time * 0.49) * q.xy;
-		q.xz = rot2(0.95) * q.xz;
-		q *= 1.59; sc *= 1.59;
-	}
-	vec3 b = abs(q) - vec3(0.60);
-	return (length(max(b, vec3(0.0))) + min(max(b.x, max(b.y, b.z)), 0.0)) / sc;
+float field(vec2 p, float t, float ph){
+    float v;
+    v = 0.25 * (sin(p.x * 2.05 + t * 3.96 + ph) + sin(p.y * 8.91 - t * 3.96 + ph)
+        + sin((p.x + p.y) * 8.01 + t * 3.96 + ph) + sin(length(p) * 4.07 - t * 3.96 + ph));
+    return v;
 }
 
 void main(){
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	vec3 ro = vec3(0.0, 0.0, -2.81);
-	vec3 rd = normalize(vec3(p, 1.63));
-	rd.xy = rot2(time * 0.31) * rd.xy;
-	float tt = 0.0; float it = 0.0;
-	for(int i = 0; i < 64; i++){
-		vec3 pos = ro + rd * tt;
-		float dm = map(pos);
-		if(dm < 0.002 || tt > 14.0) break;
-		tt += dm * 0.81;
-		it += 1.0;
-	}
-	float fog = exp(-tt * 0.16);
-	vec3 col = hue(tt * 0.13 + time * 0.09) * fog;
-	col += vec3(0.57, 0.62, 0.55) * (it / 64.0) * 0.57;
+	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
+	p.x *= resolution.x / resolution.y;
+	p *= 1.28;
+	{ float lr = log(length(p) + 0.001); float la = atan(p.y, p.x); p = vec2(la * 1.34, lr * 1.15 + time * 0.21); }
+	p = rot2(p.y * -3.32 + time * 0.13) * p;
+	p = fract(p * 1.20) - 0.5;
+	{ float fr = length(p); p *= 1.0 + 0.24 * fr * fr; }
+	float d = field(p, time, 0.0);
+	vec3 col = palette(d * 1.30 + time * 0.26, vec3(0.58, 0.52, 0.47), vec3(0.33, 0.35, 0.35), vec3(0.85, 1.27, 0.82), vec3(0.05, 0.82, 0.28));
+	col = fract(col * 1.75);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

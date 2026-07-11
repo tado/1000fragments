@@ -2,26 +2,33 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-vec2 hash22(vec2 p){
-    return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
 }
 
+float field(vec2 p, float t, float ph){
+    float v;
+    v = 0.5 * (sin(p.x * 6.82 + t * 5.95 + ph) + sin(p.y * 4.10 - t * 1.59 + ph));
+    return v;
+}
+float field2(vec2 p, float t, float ph){
+    float v;
+    float sa = atan(p.y, p.x); float sr = length(p);
+    v = sin(sa * 11.76 + sr * 5.14 - t * 2.10 + ph);
+    return v;
+}
 
 void main(){
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p *= 1.78;
-	vec3 col = vec3(0.021, 0.047, 0.040);
-	for(int pl = 0; pl < 4; pl++){
-		float fl = float(pl) + 1.0;
-		vec2 q = p * (fl * 2.48 + 4.39) + fl * 7.31;
-		vec2 id = floor(q); vec2 gv = fract(q) - 0.5;
-		vec2 off = (hash22(id) - 0.5) * 0.78;
-		float pd = length(gv - off);
-		float tw = 0.5 + 0.5 * sin(time * 3.57 + hash21(id) * 6.2831853);
-		vec3 tint = mix(vec3(0.86, 0.70, 0.36), vec3(0.37, 0.79, 0.99), hash21(id + 7.0));
-		col += tint * smoothstep(0.09, 0.0, pd) * tw / fl;
-	}
-	col = fract(col * 1.06);
+	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
+	p *= 2.01;
+	p = rot2(0.89) * p;
+	{ p = vec2(atan(p.y, p.x) * 2.93, length(p) * 2.84 - time * 0.16); }
+	{ float fr = length(p); p *= 1.0 + -0.31 * fr * fr; }
+	for(int fo = 0; fo < 4; fo++){ p = abs(p) - 0.58; p = rot2(1.61) * p; }
+	float d1 = field(p, time, 0.0);
+	float d2 = field2(p, time, 1.54);
+	float d = mix(d1, d2, 0.5 + 0.5 * sin(time * 0.5));
+	vec3 col = palette(d * 0.88 + time * 0.18, vec3(0.48, 0.48, 0.56), vec3(0.49, 0.34, 0.49), vec3(0.87, 1.30, 0.97), vec3(0.59, 0.13, 0.85));
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

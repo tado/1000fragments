@@ -2,31 +2,25 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-vec2 nodePos(float fi){
-    float h1 = fract(sin(fi * 12.9898) * 43758.5453);
-    float h2 = fract(sin(fi * 78.2330) * 43758.5453);
-    return vec2(sin(time * (0.44 + 1.03 * h1) + fi * 2.39), cos(time * (0.68 + 0.90 * h2) + fi * 1.73)) * 0.68;
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    return a + b * cos(6.28318 * (c * t + d));
+}
+
+float field(vec2 p, float t, float ph){
+    float v;
+    v = 0.5 * sin(length(p) * 18.65 - t * 7.48 + ph);
+    return v;
 }
 
 void main(){
 	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p *= 1.13;
-	vec3 col = vec3(0.014, 0.040, 0.031);
-	for(int i = 0; i < 7; i++){
-		float fi = float(i);
-		vec2 na = nodePos(fi);
-		col += (0.5 + 0.5 * cos(vec3(0.0, 2.094, 4.188) + fi * 1.49 + time * 0.19)) * (0.0054 / (length(p - na) + 0.028));
-		for(int j = i + 1; j < 7; j++){
-			vec2 nb = nodePos(float(j));
-			float ll = length(na - nb);
-			if(ll < 0.76){
-				vec2 pa = p - na; vec2 ba = nb - na;
-				float hh = clamp(dot(pa, ba) / (dot(ba, ba) + 0.0001), 0.0, 1.0);
-				float sd = length(pa - ba * hh);
-				col += (0.5 + 0.5 * cos(vec3(0.0, 2.094, 4.188) + ll * 1.12 + time * 0.71)) * (0.0024 / (sd + 0.019)) * (1.0 - ll / 0.76);
-			}
-		}
-	}
-	col = col / (1.0 + col);
+	{ float ka = atan(p.y, p.x); float kr = length(p); float kn = 8.0; ka = mod(ka, 6.2831853 / kn); ka = abs(ka - 3.1415927 / kn); p = kr * vec2(cos(ka), sin(ka)); }
+	for(int fo = 0; fo < 3; fo++){ p = abs(p) - 0.39; p = rot2(2.32) * p; }
+	p += vec2(0.00, -0.26) * sin(length(p) * 5.49 - time * 1.14) * 0.20;
+	p = fract(p * 2.17) - 0.5;
+	float d = field(p, time, 0.0);
+	vec3 col = palette(d * 1.24 + time * 0.27, vec3(0.54, 0.42, 0.43), vec3(0.39, 0.49, 0.42), vec3(0.96, 1.01, 0.82), vec3(0.37, 0.66, 0.27));
+	col = clamp((col - 0.5) * 1.86 + 0.5, 0.0, 1.0);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

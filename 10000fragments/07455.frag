@@ -2,27 +2,30 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
-    return a + b * cos(6.28318 * (c * t + d));
+mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+vec2 hash22(vec2 p){
+    return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)))) * 43758.5453);
 }
 
 float field(vec2 p, float t, float ph){
     float v;
-    v = 0.25 * (sin(p.x * 8.26 + t * 0.86 + ph) + sin(p.y * 10.50 - t * 0.86 + ph)
-        + sin((p.x + p.y) * 4.99 + t * 0.86 + ph) + sin(length(p) * 8.44 - t * 0.86 + ph));
+    vec2 vp = p * 6.84; vec2 vi = floor(vp), vf = fract(vp); float md = 1.0;
+    for(int vy = -1; vy <= 1; vy++) for(int vx = -1; vx <= 1; vx++){
+        vec2 nb = vec2(float(vx), float(vy));
+        vec2 pt = hash22(vi + nb); pt = 0.5 + 0.5 * sin(t * 1.67 + 6.2831853 * pt + ph);
+        md = min(md, length(nb + pt - vf)); }
+    v = md * 2.0 - 1.0;
     return v;
 }
 
 void main(){
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	p += vec2(sin(time * 0.63), cos(time * 1.17)) * 0.13;
-	float an = atan(p.y, p.x) + time * 0.15;
-	float r = length(p) + 0.0001;
-	vec2 tv = vec2(an * 2.83 / 3.1415927, 1.41 / r + time * 2.27);
-	float d = field(tv, time, 0.0);
-	vec3 col = palette(d * 0.84 + time * 0.30, vec3(0.44, 0.57, 0.46), vec3(0.31, 0.38, 0.32), vec3(1.27, 1.36, 1.40), vec3(0.39, 0.20, 0.02));
-	col *= clamp(r * 1.61, 0.0, 1.0);
-	vec2 vg = gl_FragCoord.xy / resolution - 0.5;
-	col *= 1.0 - 1.33 * dot(vg, vg);
+	vec2 p = gl_FragCoord.xy / resolution.yy - vec2(0.9, 0.5);
+	p *= 0.91;
+	{ float ka = atan(p.y, p.x); float kr = length(p); float kn = 3.0; ka = mod(ka, 6.2831853 / kn); ka = abs(ka - 3.1415927 / kn); p = kr * vec2(cos(ka), sin(ka)); }
+	for(int wi = 0; wi < 3; wi++){ float wf = float(wi) + 1.0; p.x += 0.49 / wf * sin(wf * 1.95 * p.y + time * 1.14); p.y += 0.35 / wf * cos(wf * 1.69 * p.x + time * 1.42); }
+	p = rot2(time * 0.69) * p;
+	vec3 col = vec3(field(p, time, 0.0), field(p, time, 0.33), field(p, time, 0.67));
+	col = 0.5 + 0.5 * col;
+	col = fract(col * 2.25);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

@@ -2,34 +2,28 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
-    return a + b * cos(6.28318 * (c * t + d));
+float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise2(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i + vec2(0.0, 0.0)), hash21(i + vec2(1.0, 0.0)), u.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 
-float fieldA(vec2 p, float t, float ph){
+float field(vec2 p, float t, float ph){
     float v;
-    vec2 cp = p * 1.67;
-    v = 0.5 * (sin(4.0 * cp.x + t * 2.67) * sin(5.0 * cp.y + ph)
-             + sin(5.0 * cp.x - t * 1.07) * sin(4.0 * cp.y + ph));
-    return v;
-}
-float fieldB(vec2 p, float t, float ph){
-    float v;
-    float sa = atan(p.y, p.x); float sr = length(p);
-    v = sin(sa * 10.46 + sr * 8.05 - t * 4.49 + ph);
+    float fs = 0.0, famp = 0.5; vec2 fq = p * 5.52 + ph;
+    for(int fi = 0; fi < 4; fi++){ fs += famp * noise2(fq + t * 0.52); fq *= 2.0; famp *= 0.5; }
+    v = fs * 2.0 - 1.0;
     return v;
 }
 
 void main(){
 	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
 	p.x *= resolution.x / resolution.y;
-	p *= 2.75;
-	vec2 q1 = p; vec2 q2 = p;
-	{ float iv = dot(q2, q2) + 0.05; q2 = q2 / iv * 0.79; }
-	q2 = (floor(q2 * 14.4) + 0.5) / 14.4;
-	float d1 = fieldA(q1, time, 0.0);
-	float d2 = fieldB(q2, time, 1.91);
-	float d = 0.5 * (d1 + d2);
-	vec3 col = palette(d * 1.09 + time * 0.06, vec3(0.48, 0.53, 0.55), vec3(0.38, 0.48, 0.35), vec3(1.02, 0.74, 1.15), vec3(0.12, 0.19, 0.35));
+	p += vec2(-0.27, -0.01) * sin(length(p) * 3.17 - time * 2.00) * 0.32;
+	for(int wi = 0; wi < 2; wi++){ float wf = float(wi) + 1.0; p.x += 0.47 / wf * sin(wf * 3.22 * p.y + time * 1.91); p.y += 0.33 / wf * cos(wf * 2.49 * p.x + time * 1.42); }
+	vec3 col = vec3(field(p, time, 0.0), field(p, time, 0.21), field(p, time, 0.41));
+	col = 0.5 + 0.5 * col;
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

@@ -2,36 +2,30 @@ uniform float time;
 uniform vec2 resolution;
 out vec4 fragColor;
 
-mat2 rot2(float a){ float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-
-float fieldA(vec2 p, float t, float ph){
-    float v;
-    v = 0.25 * (sin(p.x * 7.53 + t * 4.37 + ph) + sin(p.y * 2.41 - t * 4.37 + ph)
-        + sin((p.x + p.y) * 11.15 + t * 4.37 + ph) + sin(length(p) * 11.44 - t * 4.37 + ph));
-    return v;
+float noise2(vec2 p){
+    vec2 i = floor(p), f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash21(i + vec2(0.0, 0.0)), hash21(i + vec2(1.0, 0.0)), u.x),
+               mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x), u.y);
 }
-float fieldB(vec2 p, float t, float ph){
+
+float field(vec2 p, float t, float ph){
     float v;
-    vec2 tp = p * 7.15; vec2 ti = floor(tp); vec2 tf = fract(tp);
-    if(hash21(ti) < 0.5) tf.x = 1.0 - tf.x;
-    float dd = min(abs(length(tf) - 0.5), abs(length(tf - vec2(1.0)) - 0.5));
-    v = sin(dd * 13.62 - t * 3.69 + ph);
+    float fs = 0.0, famp = 0.5; vec2 fq = p * 2.03 + ph;
+    for(int fi = 0; fi < 4; fi++){ fs += famp * noise2(fq + t * 0.11); fq *= 2.0; famp *= 0.5; }
+    v = fs * 2.0 - 1.0;
     return v;
 }
 
 void main(){
 	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
 	p.x *= resolution.x / resolution.y;
-	p *= 2.78;
-	vec2 q1 = p; vec2 q2 = p;
-	{ float fr = length(q1); q1 *= 1.0 + 0.75 * fr * fr; }
-	for(int fo = 0; fo < 2; fo++){ q1 = abs(q1) - 0.58; q1 = rot2(2.59) * q1; }
-	float d1 = fieldA(q1, time, 0.0);
-	float d2 = fieldB(q2, time, 0.54);
-	float d = 0.5 * (d1 + d2);
-	vec3 col = vec3(0.55, 0.44, 0.97) * (0.16 / (abs(d) + 0.04));
-	col = col / (1.0 + col);
-	col = mod(col * 2.30, 1.0);
+	p *= 1.42;
+	p = fract(p * 1.03) - 0.5;
+	p = abs(p) - 0.36;
+	float d = field(p, time, 0.0);
+	vec3 col = vec3(0.5 + 0.5 * d) * vec3(1.34, 1.19, 1.15) + vec3(0.30, 0.14, 0.15);
+	col = fract(col * 1.15);
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }

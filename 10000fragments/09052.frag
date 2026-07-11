@@ -7,27 +7,33 @@ vec3 palette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
     return a + b * cos(6.28318 * (c * t + d));
 }
 
-float map(vec3 q){
-	q.xz = rot2(time * 0.71) * q.xz;
-	q.xy = rot2(time * 0.65) * q.xy;
-	vec2 w = vec2(length(q.xz) - 0.98, q.y);
-	return length(w) - 0.39;
+float field(vec2 p, float t, float ph){
+    float v;
+    float sa = atan(p.y, p.x); float sr = length(p);
+    float petal = 0.64 + 0.24 * cos(sa * 4 + t * 1.51 + ph);
+    v = sin((sr - petal) * 14.87);
+    return v;
+}
+float field2(vec2 p, float t, float ph){
+    float v;
+    float xs = 0.0;
+    for(int xi = 1; xi < 9; xi++){ float jf = float(xi);
+        vec2 im = vec2(sin(t * 0.57 + jf * 4.0), cos(t * 0.17 * jf)) * 0.39;
+        xs += sin(length(p - im) * 84.52 - t * 6.43 + ph) * 0.5; }
+    v = xs / (1.0 + abs(xs));
+    return v;
 }
 
 void main(){
-	vec2 p = (gl_FragCoord.xy * 2.0 - resolution) / min(resolution.x, resolution.y);
-	vec3 ro = vec3(0.0, 0.0, -3.16);
-	vec3 rd = normalize(vec3(p, 1.56));
-	float tt = 0.0; float it = 0.0;
-	for(int i = 0; i < 56; i++){
-		vec3 pos = ro + rd * tt;
-		float dm = map(pos);
-		if(dm < 0.002 || tt > 14.0) break;
-		tt += dm * 0.64;
-		it += 1.0;
-	}
-	float fog = exp(-tt * 0.28);
-	vec3 col = palette(tt * 0.31 + time * 0.12, vec3(0.54, 0.56, 0.48), vec3(0.44, 0.33, 0.37), vec3(1.19, 1.25, 0.90), vec3(0.38, 0.17, 0.98)) * fog;
-	col += vec3(0.20, 0.93, 0.71) * (it / 56.0) * 0.57;
+	vec2 p = gl_FragCoord.xy / resolution.xy - 0.5;
+	p.x *= resolution.x / resolution.y;
+	p *= 2.54;
+	{ float lr = log(length(p) + 0.001); float la = atan(p.y, p.x); p = vec2(la * 1.55, lr * 1.69 + time * 0.49); }
+	p = rot2(length(p) * -2.99 + time * 0.86) * p;
+	for(int fo = 0; fo < 4; fo++){ p = abs(p) - 0.12; p = rot2(0.96) * p; }
+	float d1 = field(p, time, 0.0);
+	float d2 = field2(p, time, 1.06);
+	float d = d1 * d2;
+	vec3 col = palette(d * 1.46 + time * 0.07, vec3(0.45, 0.51, 0.40), vec3(0.37, 0.37, 0.32), vec3(1.14, 0.84, 1.09), vec3(0.77, 0.20, 0.83));
 	fragColor = TDOutputSwizzle(vec4(col, 1.0));
 }
