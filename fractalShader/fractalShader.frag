@@ -1,9 +1,11 @@
 // =====================================================================
 //  fractalShader.frag
 //
-//  TouchDesigner GLSL TOP — composites THREE shader inputs into a single
-//  self-similar (fractal) tiling.  Designed for three GLSL TOPs each
-//  running a different 1000fragments_fin/NNNN.frag.
+//  TouchDesigner GLSL TOP — composites up to THREE shader inputs into a
+//  single self-similar (fractal) tiling.  Designed for GLSL TOPs each
+//  running a different 1000fragments_fin/NNNN.frag.  The input count comes
+//  from TD_NUM_2D_INPUTS, so one or two connected inputs also work; three
+//  is the hard ceiling of the GLSL TOP itself.
 //
 //  ---------------------------------------------------------------
 //  NETWORK SETUP
@@ -18,7 +20,7 @@
 //                    resolution  vec2    -> optional; if left out the size
 //                                           of input 0 is used instead
 //
-//    Set the three source TOPs to Filter = "Mipmap Linear" on their
+//    Set the source TOPs to Filter = "Mipmap Linear" on their
 //    Common page.  The deep levels of the fractal minify heavily and this
 //    shader picks the matching mip level analytically, so without mipmaps
 //    those levels alias into noise.
@@ -56,7 +58,7 @@
 //                 cell its own aspect ratio, and a per-cell repeat count
 //                 makes the tiling density jump from coarse blocks to fine
 //                 moire.
-//    1  kaleido   abs-fold IFS; the three inputs accumulate across scales
+//    1  kaleido   abs-fold IFS; the inputs accumulate across scales
 //
 //  Mode 0 reads several controls differently, since it has no fold or
 //  accumulation of its own:
@@ -72,6 +74,11 @@
 //
 //  Re-roll period is 1 / (speed * 1.5 * layout) seconds for the subdivision
 //  and 1 / (speed * 7) for the contents — at the defaults, 11.1 s and 2.4 s.
+//  Setting uClock.x / uClock.y from the network overrides the subdivision
+//  and cell-contents clocks: each then changes only when its number is
+//  bumped, so the intervals can be randomised rather than fixed.
+//  uClock.z carries a tiling fineness step + 1 (steps 0..11): 0 is a single
+//  full-screen cell, 11 is about 3x finer than the falloff default.
 //
 //  Both modes pick their mip level analytically from the tile's own scale,
 //  so the deep levels stay smooth without relying on screen-space
@@ -86,10 +93,21 @@ uniform vec4  uMode;
 uniform vec4  uShape;
 uniform vec4  uLook;
 uniform vec4  uMotion;
+// Optional external clocks / controls for the glitch mode.  x = subdivision
+// (layout) generation, y = cell-contents generation, z = tiling fineness as
+// step+1 (so 0 still means "nothing is driving me"; steps run 0..11).  When one is non-zero that clock
+// advances only when something outside bumps the number, which lets each
+// state last a different length of time instead of changing on a fixed
+// beat.  A project that never declares uClock gets 0 and keeps the steady
+// internal clocks.
+uniform vec4  uClock;
 
 out vec4 fragColor;
 
 #define TAU    6.28318530718
+// how many source inputs are actually connected -- the input picker works
+// off this rather than a hard-coded 3, so the shader adapts to the project
+#define NIN    float(TD_NUM_2D_INPUTS)
 #define MAXL   8
 #define MAXG   16      // the glitch mode needs far deeper recursion than the
                        // fold-based modes before the mosaic reads as dense
@@ -102,6 +120,7 @@ int   levels;
 float ratio, twist, tile, fold;
 float falloff, chroma, grout, vign;
 float speed, layoutRate, wobble, seed;
+float layoutGen, contentGen, fineStep;
 
 // Set by main().  gExt is the half-extent of the visible area in p units;
 // gAxis is p before the global spin/wobble, because the glitch mode's
@@ -131,6 +150,10 @@ void setup()
     layoutRate = max(0.0, mix(1.00, uMotion.y, s));
     wobble  = clamp(mix(0.30, uMotion.z, s), 0.0, 1.0);
     seed    =       mix(0.00, uMotion.w, s);
+    // not gated by uCustom: these are counters fed from outside, not looks
+    layoutGen  = uClock.x;
+    contentGen = uClock.y;
+    fineStep   = uClock.z;
 }
 
 // ---------------------------------------------------------------------
@@ -143,20 +166,19 @@ float hash21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453)
 float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
 
 // Sampler arrays may only be indexed by a constant expression, so the
-// three inputs are unrolled by hand.  Fewer than three connected inputs
-// degrade gracefully instead of failing to compile.
+// inputs are unrolled by hand, each branch compiled only when that input
+// exists.  Three is the ceiling: a GLSL TOP in TouchDesigner 2025.33070 has
+// exactly three input connectors and they do not grow -- a .toe may record
+// more connections but the loader keeps only the first three.
 vec3 fetch(int i, vec2 uv, float lod)
 {
-#if TD_NUM_2D_INPUTS >= 3
-    if(i == 0) return textureLod(sTD2DInputs[0], uv, lod).rgb;
+#if TD_NUM_2D_INPUTS > 1
     if(i == 1) return textureLod(sTD2DInputs[1], uv, lod).rgb;
-    return textureLod(sTD2DInputs[2], uv, lod).rgb;
-#elif TD_NUM_2D_INPUTS == 2
-    if(i == 1) return textureLod(sTD2DInputs[1], uv, lod).rgb;
-    return textureLod(sTD2DInputs[0], uv, lod).rgb;
-#else
-    return textureLod(sTD2DInputs[0], uv, lod).rgb;
 #endif
+#if TD_NUM_2D_INPUTS > 2
+    if(i == 2) return textureLod(sTD2DInputs[2], uv, lod).rgb;
+#endif
+    return textureLod(sTD2DInputs[0], uv, lod).rgb;
 }
 
 // dens = size of one screen pixel measured in uv units.  Turning it into
@@ -178,7 +200,7 @@ vec3 tileLook(vec2 cellId, vec2 uv, float dens, float lvl, out float edge)
     vec2 c = rot2(turn * 1.5707963) * (uv - 0.5);
     uv = c + 0.5;
 
-    int idx = int(mod(floor(h * 3.0) + lvl, 3.0));
+    int idx = int(mod(floor(h * NIN) + lvl, NIN));
 
     // stay a texel inside the tile so bilinear taps never wrap around
     vec2 suv = clamp(uv, 0.0, 1.0) * 0.996 + 0.002;
@@ -259,15 +281,56 @@ vec3 modeGlitch(float pxP)
     // cell contents keep stuttering.  `layoutRate` scales the first one
     // alone, so the ratio between them is adjustable, not fixed.
     // ('layout' itself is a reserved GLSL keyword.)
-    float sSlow = floor(time * speed * layoutRate * 1.5) + seed * 13.0;
-    float sFast = floor(time * speed * 7.0) + seed * 29.0;
+    // Subdivision generation.  Driven from outside when uClock.x is set, so
+    // the layout can hold for a randomly chosen span each time; otherwise it
+    // advances on the steady internal clock.
+    float sSlow = (layoutGen > 0.5 ? layoutGen
+                                   : floor(time * speed * layoutRate * 1.5))
+                  + seed * 13.0;
+    float sFast = (contentGen > 0.5 ? contentGen
+                                    : floor(time * speed * 7.0))
+                  + seed * 29.0;
 
     vec2 lo = -gExt, hi = gExt;
     float depth = 0.0;
     // Chance a cell keeps subdividing.  This, not the depth cap, is what
     // sets the density: at 0.87 a branch survives ~8 levels on average.
     float split = mix(0.70, 0.98, falloff);
-    int gLevels = min(levels + 8, MAXG);
+    float pBase   = split;
+    float repCeil = 1.0 + tile * 20.0;
+    float boost   = 1.0;
+
+    // uClock.z, when driven, replaces that with one of 12 fineness steps.
+    // Step 0 leaves the frame as a single cell with no repeats; step 11 sits
+    // about 1.5x finer than the falloff-driven default.  The ramp
+    // interpolates the EXPECTED number of splits rather than the probability
+    // itself, which otherwise crowds against 1 and makes the low steps
+    // indistinguishable from each other.
+    float dMin = 0.0;        // splits every cell is guaranteed
+    float shiftAmt = 1.0;    // scales the sideways slab displacement
+    if(fineStep > 0.5){
+        float st = clamp(fineStep - 1.0, 0.0, 11.0);   // the step, 0..11
+        float f  = st / 11.0;
+        // Halving the linear cell size costs exactly two more splits, so the
+        // headroom above the falloff default is expressed in split counts:
+        // +1.17 would be 1.5x, +3.17 is twice that again.
+        float dTop = split / max(1.0 - split, 1e-4) + 3.17;
+        // Target mean depth.  Step 1 starts at 1.5 rather than sliding from
+        // zero: below one split the outcome hangs on a couple of fixed
+        // hashes and several early steps came out identical.
+        float D = (st < 0.5) ? 0.0 : mix(1.5, dTop, (st - 1.0) / 10.0);
+        // Most of the depth is guaranteed and the remainder left to chance,
+        // so the ramp is monotonic while the cells still vary in size.
+        dMin = floor(D * 0.7);
+        float rest = max(D - dMin, 0.0);
+        pBase = rest / (1.0 + rest);    // mean depth then works out to D
+        repCeil  = (1.0 + tile * 20.0) * 3.0 * f;
+        boost    = 0.0;                 // dMin already sets the floor
+        shiftAmt = f;                   // step 0 must not wrap the image
+    }
+    // the driven ramp needs the full depth budget, or the top steps get
+    // truncated by the cap before they reach the density they ask for
+    int gLevels = (fineStep > 0.5) ? MAXG : min(levels + 8, MAXG);
 
     for(int i = 0; i < MAXG; i++){
         if(i >= gLevels) break;
@@ -277,8 +340,9 @@ vec3 modeGlitch(float pxP)
         // with a huge flat slab.  Unlike an aspect-driven bias this can't run
         // away: splitting shrinks the cell, which relieves the pressure.
         float rel = max(sz.x / gExt.x, sz.y / gExt.y) * 0.5;
-        float pSplit = mix(split, 0.995, smoothstep(0.18, 0.75, rel));
-        if(hash21(cid + sSlow) > pSplit) break;      // this cell is a leaf
+        float pSplit = mix(pBase, 0.995, smoothstep(0.18, 0.75, rel) * boost);
+        // below dMin the cell splits no matter what the hash says
+        if(float(i) >= dMin && hash21(cid + sSlow) > pSplit) break;
         float ha = hash21(cid + 1.7 + sSlow);
         float hb = hash21(cid + 9.3 + sSlow);
         // The axis is an unbiased coin flip on purpose.  Biasing it toward
@@ -302,7 +366,7 @@ vec3 modeGlitch(float pxP)
 
     // per-cell fineness, independent per axis.  The exponent biases most
     // cells coarse so the fine moire patches stay a minority.
-    float repMax = 1.0 + tile * 20.0;
+    float repMax = repCeil;
     vec2 rep = floor(1.0 + pow(vec2(hash21(cid + 3.1 + sFast),
                                     hash21(cid + 6.9 + sFast)),
                                vec2(max(ratio, 0.5))) * repMax);
@@ -311,11 +375,11 @@ vec3 modeGlitch(float pxP)
     // datamosh slab shift on some cells
     float h3 = hash21(cid + 12.7 + sFast);
     float h4 = hash21(cid + 21.3 + sFast);
-    tuv.x = fract(tuv.x + step(0.55, h3) * (h4 - 0.5) * twist * 2.0);
+    tuv.x = fract(tuv.x + step(0.55, h3) * (h4 - 0.5) * twist * 2.0 * shiftAmt);
 
     float dens = max(rep.x / sz.x, rep.y / sz.y) * pxP;
     float lod  = lodFor(dens);
-    int   idx  = int(mod(floor(hash21(cid + 30.1 + sFast) * 3.0) + depth, 3.0));
+    int   idx  = int(mod(floor(hash21(cid + 30.1 + sFast) * NIN) + depth, NIN));
 
     vec2 suv = clamp(tuv, 0.0, 1.0) * 0.996 + 0.002;
     vec3 col = fetch(idx, suv, lod);
