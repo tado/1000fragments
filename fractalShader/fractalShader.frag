@@ -77,8 +77,9 @@
 //  Setting uClock.x / uClock.y from the network overrides the subdivision
 //  and cell-contents clocks: each then changes only when its number is
 //  bumped, so the intervals can be randomised rather than fixed.
-//  uClock.z carries a tiling fineness step + 1 (steps 0..11): 0 is a single
-//  full-screen cell, 11 is about 3x finer than the falloff default.
+//  uClock.z carries a tiling fineness step + 1 (steps 0..23): 0 is a single
+//  full-screen cell, 11 is about 3x finer than the falloff default, and the
+//  ramp keeps the same slope on up to 23.
 //
 //  Both modes pick their mip level analytically from the tile's own scale,
 //  so the deep levels stay smooth without relying on screen-space
@@ -109,8 +110,9 @@ out vec4 fragColor;
 // off this rather than a hard-coded 3, so the shader adapts to the project
 #define NIN    float(TD_NUM_2D_INPUTS)
 #define MAXL   8
-#define MAXG   16      // the glitch mode needs far deeper recursion than the
-                       // fold-based modes before the mosaic reads as dense
+#define MAXG   28      // the glitch mode needs far deeper recursion than the
+                       // fold-based modes; the top fineness steps aim at a
+                       // mean depth above 20, so the cap has to clear that
 
 // ---- resolved controls (filled in by setup()) ------------------------
 int   mode;
@@ -300,25 +302,30 @@ vec3 modeGlitch(float pxP)
     float repCeil = 1.0 + tile * 20.0;
     float boost   = 1.0;
 
-    // uClock.z, when driven, replaces that with one of 12 fineness steps.
+    // uClock.z, when driven, replaces that with one of 24 fineness steps.
     // Step 0 leaves the frame as a single cell with no repeats; step 11 sits
-    // about 1.5x finer than the falloff-driven default.  The ramp
+    // about 3x finer than the falloff-driven default and step 23 carries the
+    // same slope on to roughly 30x the cell count of step 11.  The ramp
     // interpolates the EXPECTED number of splits rather than the probability
     // itself, which otherwise crowds against 1 and makes the low steps
     // indistinguishable from each other.
     float dMin = 0.0;        // splits every cell is guaranteed
     float shiftAmt = 1.0;    // scales the sideways slab displacement
+    float gCap = 16.0;       // depth cap while driven; see below
     if(fineStep > 0.5){
-        float st = clamp(fineStep - 1.0, 0.0, 11.0);   // the step, 0..11
+        float st = clamp(fineStep - 1.0, 0.0, 23.0);   // the step, 0..23
+        // Anchored on step 11, not on the top of the range, so steps 0..11
+        // render exactly as they did before the range was extended and a
+        // live pattern written against them still means the same thing.
         float f  = st / 11.0;
         // Halving the linear cell size costs exactly two more splits, so the
-        // headroom above the falloff default is expressed in split counts:
-        // +1.17 would be 1.5x, +3.17 is twice that again.
+        // headroom above the falloff default is expressed in split counts.
         float dTop = split / max(1.0 - split, 1e-4) + 3.17;
-        // Target mean depth.  Step 1 starts at 1.5 rather than sliding from
-        // zero: below one split the outcome hangs on a couple of fixed
-        // hashes and several early steps came out identical.
-        float D = (st < 0.5) ? 0.0 : mix(1.5, dTop, (st - 1.0) / 10.0);
+        // Target mean depth: the old slope, simply carried on past step 11.
+        // Step 1 starts at 1.5 rather than sliding up from zero -- below one
+        // split the outcome hangs on a couple of fixed hashes and several
+        // early steps came out identical.
+        float D = (st < 0.5) ? 0.0 : 1.5 + (st - 1.0) * (dTop - 1.5) / 10.0;
         // Most of the depth is guaranteed and the remainder left to chance,
         // so the ramp is monotonic while the cells still vary in size.
         dMin = floor(D * 0.7);
@@ -326,11 +333,16 @@ vec3 modeGlitch(float pxP)
         pBase = rest / (1.0 + rest);    // mean depth then works out to D
         repCeil  = (1.0 + tile * 20.0) * 3.0 * f;
         boost    = 0.0;                 // dMin already sets the floor
-        shiftAmt = f;                   // step 0 must not wrap the image
+        // beyond step 11 a bigger shift only wraps the tile further, so cap
+        shiftAmt = min(f, 1.0);
+        // The cap has to rise with the target depth or the top steps get
+        // truncated before they reach the density they ask for.  It stays at
+        // 16 through step 11 so those steps keep clipping their deep tail
+        // exactly where they used to, and only the new steps recurse further.
+        gCap = 16.0 + max(st - 11.0, 0.0);
     }
-    // the driven ramp needs the full depth budget, or the top steps get
-    // truncated by the cap before they reach the density they ask for
-    int gLevels = (fineStep > 0.5) ? MAXG : min(levels + 8, MAXG);
+    int gLevels = (fineStep > 0.5) ? int(min(gCap, float(MAXG)))
+                                   : min(levels + 8, MAXG);
 
     for(int i = 0; i < MAXG; i++){
         if(i >= gLevels) break;
