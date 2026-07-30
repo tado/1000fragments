@@ -139,7 +139,11 @@ void setup()
 
     ratio   = clamp(mix(2.00, uShape.x,  s), 1.15, 3.0);
     twist   =       mix(0.35, uShape.y,  s);
-    tile    = clamp(mix(1.00, uShape.z,  s), 1.0,  6.0);
+    // Floor is 0, not 1: repCeil is 1 + tile*20, so a floor of 1 meant a
+    // cell could never show fewer than ~21 repeats.  0 lets the repeats be
+    // turned off entirely (repCeil 1 -> exactly one copy per cell).  Values
+    // of 1 and above are unaffected, so the other project reads the same.
+    tile    = clamp(mix(1.00, uShape.z,  s), 0.0,  6.0);
     fold    = clamp(mix(0.45, uShape.w,  s), 0.05, 0.95);
 
     falloff = clamp(mix(0.62, uLook.x,   s), 0.10, 0.98);
