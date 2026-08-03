@@ -407,8 +407,11 @@ vec3 modeGlitch(float pxP)
         col.b = fetch(idx, clamp(suv - vec2(o, 0.0), 0.002, 0.998), lod).b;
     }
 
-    // occasional inverted and hard-clipped cells
-    col = mix(col, 1.0 - col, step(0.94, hash21(cid + 57.3 + sFast)));
+    // occasional hard-clipped cells.  The per-cell INVERSION that used to sit
+    // here is disabled: it ran downstream of the lvl_* fade, so a cell faded
+    // to black came back out as 1.0-0.0 = white and stayed lit after
+    // everything else had gone.  Restore by uncommenting.
+    // col = mix(col, 1.0 - col, step(0.94, hash21(cid + 57.3 + sFast)));
     col = mix(col, step(vec3(0.5), col),
               step(0.90, hash21(cid + 63.7 + sFast)) * 0.7);
 
